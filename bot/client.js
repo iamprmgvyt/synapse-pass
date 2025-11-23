@@ -16,7 +16,7 @@ const commands = [
     {
         name: 'setup-auth',
         description: 'Sets up the Synapse Pass Auth Gate for this server.',
-        // Restriction: Administrator (Permission 8) or the custom Admin Role can use this.
+        // Restriction: ONLY Administrator (Permission 8) can use this command.
         default_member_permissions: "8", 
         options: [
             {
@@ -29,26 +29,12 @@ const commands = [
                 name: 'visibility',
                 description: 'Should the setup message be visible to everyone (Public) or only you (Private)?',
                 type: 3, // STRING type
-                required: true, // <-- Đã thay đổi thành BẮT BUỘC (true)
+                required: true,
                 choices: [
                     { name: 'Public', value: 'public' },
                     { name: 'Private (Ephemeral)', value: 'private' }
                 ]
             }
-        ],
-    },
-    {
-        name: 'setadminrole',
-        description: 'Designates a specific role that can manage the Auth Gate.',
-        // Restriction: ONLY Administrator (Permission 8) can set the management role initially.
-        default_member_permissions: "8", 
-        options: [
-            {
-                name: 'role',
-                description: 'The role to grant management permissions to.',
-                type: 8, // ROLE type
-                required: true,
-            },
         ],
     },
     {
@@ -81,7 +67,7 @@ async function deployCommands() {
             { body: commands },
         );
         
-        console.log(`✅ [Deploy] Successfully reloaded ${commands.length} application (/) commands, including /help and /setadminrole.`);
+        console.log(`✅ [Deploy] Successfully reloaded ${commands.length} application (/) commands.`);
     } catch (error) {
         console.error('❌ [Deploy] Error while deploying commands:', error);
     }
