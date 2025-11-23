@@ -25,6 +25,16 @@ const commands = [
                 type: 8, // ROLE type
                 required: true,
             },
+            {
+                name: 'visibility',
+                description: 'Should the setup message be visible to everyone (Public) or only you (Private)?',
+                type: 3, // STRING type
+                required: false,
+                choices: [
+                    { name: 'Public', value: 'public' },
+                    { name: 'Private (Ephemeral)', value: 'private' }
+                ]
+            }
         ],
     },
     {
