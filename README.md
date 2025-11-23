@@ -1,121 +1,125 @@
-<<<<<<< HEAD
-# 🔑 Synapse Pass: Secure OAuth2 Verification Bot
+ # 🔑 Synapse Pass: Secure OAuth2 Verification Gate for Discord
 
-This repository hosts the **Synapse Pass** project, a multi-guild OAuth2 authentication gateway built using Next.js (Serverless API) and MongoDB Atlas.
+ This project is Synapse Pass, a secure and scalable OAuth2 authentication gateway for Discord servers, built on a Serverless Next.js architecture and MongoDB.
 
----
+✨ Key Features
 
-## 🛠️ Developer Setup & Architecture
+🛡️ Secure OAuth2 Verification: Uses the standard Discord OAuth2 authorization flow to verify user identity without requiring passwords.
 
-### Stack
+🔗 Slash Command Setup: Easily configure the verification role using the /setup-auth command (Administrator only).
 
-* **Framework:** Next.js (API Routes)
-* **Database:** MongoDB Atlas (via Mongoose)
-* **Hosting:** Vercel (Serverless)
-* **Core Logic:** Discord HTTP Interactions & OAuth2 Flow
+🌐 Serverless Deployment: Optimized for Vercel (Next.js API Routes) and MongoDB Atlas for high scalability.
 
-### Prerequisites
+🤖 Optional Bot Client: Includes a lightweight bot client (using bot/client.js) for maintaining presence on Render or other WebSocket services.
 
-* Node.js (v18+)
-* MongoDB Atlas Connection String
-* Discord Application Keys (`CLIENT_ID`, `BOT_TOKEN`, `PUBLIC_KEY`)
+🚀 Quick Local Start
 
-### Quick Local Start
+📋 Prerequisites
 
-1.  **Clone the Repository & Install:**
-    ```bash
-    git clone [https://github.com/iamprmgvyt/synapse-pass-bot.git](https://github.com/iamprmgvyt/synapse-pass-bot.git)
-    cd synapse-pass-bot
-    npm install
-    ```
+Node.js (v18+)
 
-2.  **Configure Environment:**
-    Ensure your `.env.local` file contains all necessary keys (`CLIENT_ID`, `BOT_TOKEN`, `MONGODB_URI`, `REDIRECT_URI`).
+MongoDB Atlas Connection String
 
-3.  **Run Commands:**
+Discord Application Keys:
 
-    | Command | Description | Purpose |
-    | :--- | :--- | :--- |
-    | `npm run dev` | Starts the local Next.js server (http://localhost:3000) | Local Development |
-    | `npm run deploy:commands` | **Registers the `/setup-auth` command** with the Discord API. | Must run once after key changes |
+CLIENT_ID
 
----
+BOT_TOKEN
 
-## ⚙️ Key Endpoints & Logic Flow
+PUBLIC_KEY
 
-| Endpoint File | Type | Function | Required Keys |
-| :--- | :--- | :--- | :--- |
-| `/api/interactions.js` | `POST` | Handles Discord **Slash Command** (`/setup-auth`). Verifies signature, saves `GuildID` & `RoleID` to MongoDB. | `PUBLIC_KEY` |
-| `/api/auth/login.js` | `GET` | Initiates the OAuth2 redirect. Embeds the `guild_id` into the **`state`** parameter. | `CLIENT_ID`, `REDIRECT_URI` |
-| `/api/auth/callback.js` | `GET` | **Core Logic.** Exchanges the `code` for `UserID`. Finds `RoleID` using the `state` (`GuildID`) from MongoDB. Calls Discord API to assign the role. | `BOT_TOKEN`, `CLIENT_SECRET` |
+CLIENT_SECRET
 
-### Vercel Deployment Checklist
+🛠️ Setup
 
-1.  Add **all** sensitive keys (especially `MONGODB_URI` and `BOT_TOKEN`) to Vercel Environment Variables.
-2.  Ensure Discord **Interactions Endpoint URL** points to: `https://[VERCEL_URL]/api/interactions`
-3.  Ensure Discord **Redirect URI** points to: `https://[VERCEL_URL]/api/auth/callback`
-=======
-# Synapse Pass - Discord Ticket Bot
+Clone Repository & Install:
 
-Synapse Pass is a full-featured Discord ticket bot built with Node.js and Discord.js v14.
+git clone [https://github.com/iamprmgvyt/synapse-pass-bot.git](https://github.com/iamprmgvyt/synapse-pass-bot.git)
+cd synapse-pass-bot
+npm install
 
-## Features
 
-- **Dual Command System:** Supports both prefix (`!`) and slash (`/`) commands.
-- **Modular Command Structure:** Commands are organized into `free`, `premium`, and `admin` categories.
-- **Premium System:** Manage premium users with special commands and perks.
-- **Advanced Ticket System:** Highly customizable ticket creation, management, and logging.
-- **MongoDB Integration:** All data is stored in a MongoDB database for persistence.
-- **Embed Responses:** All bot responses are in a clean, consistent embed format.
-- **Button Interactions:** Modern Discord UI with buttons for ticket actions.
-- **Transcript Logging:** Automatically saves transcripts of closed tickets.
+Configure Environment:
+Ensure your .env.local file contains all necessary keys, including MONGODB_URI and the full OAuth2 callback URL, REDIRECT_URI.
 
-## Setup and Installation
+Core Operational Commands:
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-repo/synapse-pass.git
-    cd synapse-pass
-    ```
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-3.  **Configure your environment:**
-    - Rename `.env.example` to `.env`.
-    - Fill in the required values: `BOT_TOKEN`, `MONGODB_URI`, `PREFIX`, `OWNER_ID`, and `CLIENT_ID`.
-4.  **Deploy slash commands:**
-    ```bash
-    npm run deploy
-    ```
-5.  **Start the bot:**
-    ```bash
-    npm start
-    ```
+Command
 
-## Commands
+Description
 
-A full list of commands can be viewed with the `/help` command. The bot has 19 free commands and 21+ premium commands, plus admin setup commands.
+Purpose
 
-### Admin Setup
-- `/setstaffrole <role>`
-- `/setcategory <category>`
-- `/setlogchannel <channel>`
-- `/setwelcome <message>`
+npm run dev
 
-### Free Commands
-- `/newticket`
-- `/closeticket`
-- `/help`
-- and 16 more...
+Starts the local Next.js server (http://localhost:3000)
 
-### Premium Commands
-- `/addpremium <user>`
-- `/removepremium <user>`
-- `/listpremium`
-- and 18 more...
+Local Development
 
-## Hosting
+npm run deploy:commands
 
-This bot is designed to be compatible with hosting services like **Render** and **Pterodactyl**. Ensure your environment variables are set correctly on your hosting platform.
->>>>>>> d7705f512eae99dcf31b28c870815fc7efe23666
+Registers the Slash Command (/setup-auth) with the Discord API.
+
+MUST run after command changes
+
+npm run start:client
+
+Starts the Discord Bot Client (bot/client.js)
+
+Maintain Bot Connection (WebSocket)
+
+⚙️ Architecture & Logic Flow
+
+The project is split into two main components: the Serverless API (Next.js) and the Bot Client (Discord.js).
+
+1. 🌐 OAuth2 Flow and Serverless API (Next.js)
+
+File Endpoint
+
+Type
+
+Function
+
+Required Keys
+
+pages/api/interactions.js
+
+POST
+
+Handles the Slash Command (/setup-auth). Verifies the security signature and saves GuildID & RoleID to MongoDB.
+
+PUBLIC_KEY
+
+pages/api/auth/login.js
+
+GET
+
+Initiates the OAuth2 flow. Redirects the user to Discord. Embeds the guild_id into the state parameter.
+
+CLIENT_ID, REDIRECT_URI
+
+pages/api/auth/callback.js
+
+GET
+
+Core Authentication Logic. Exchanges the code for UserID. Uses the state (GuildID) to fetch RoleID from MongoDB. Calls Discord API to assign the role to the user (using BOT_TOKEN).
+
+BOT_TOKEN, CLIENT_SECRET
+
+pages/success.js / pages/error.js
+
+GET
+
+Landing page to show successful or failed verification results.
+
+-
+
+2. 🤖 Bot Client (bot/client.js)
+
+The bot/client.js file is responsible for maintaining the Bot's WebSocket connection to Discord, setting its presence, and automatically deploying commands on startup.
+
+Note: The /setup-auth command is restricted to Administrators in this file using default_member_permissions: "8".
+
+🤝 Contact & Support
+
+If you have any questions or require support, contact prmgvyt 
