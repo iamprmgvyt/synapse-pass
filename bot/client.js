@@ -16,8 +16,8 @@ const commands = [
     {
         name: 'setup-auth',
         description: 'Sets up the Synapse Pass Auth Gate for this server.',
-        // PERMISSION ENFORCEMENT: "8" is the required bit for ADMINISTRATOR.
-        default_member_permissions: "8",
+        // Restriction: Administrator (Permission 8) or the custom Admin Role can use this.
+        default_member_permissions: "8", 
         options: [
             {
                 name: 'role',
@@ -30,8 +30,8 @@ const commands = [
     {
         name: 'setadminrole',
         description: 'Designates a specific role that can manage the Auth Gate.',
-        // Restricted to Administrators initially
-        default_member_permissions: "8",
+        // Restriction: ONLY Administrator (Permission 8) can set the management role initially.
+        default_member_permissions: "8", 
         options: [
             {
                 name: 'role',
@@ -44,6 +44,8 @@ const commands = [
     {
         name: 'help',
         description: 'Displays the list of available commands and usage instructions.',
+        // Public command: no restriction
+        default_member_permissions: null, 
     },
 ];
 // --------------------------
@@ -63,12 +65,13 @@ async function deployCommands() {
     try {
         console.log('🔄 [Deploy] Started refreshing application (/) commands...');
         
+        // This 'put' replaces ALL existing application commands with the new list.
         await rest.put(
             Routes.applicationCommands(CLIENT_ID),
             { body: commands },
         );
         
-        console.log(`✅ [Deploy] Successfully reloaded ${commands.length} application (/) commands. (ADMINISTRATOR: setup-auth)`);
+        console.log(`✅ [Deploy] Successfully reloaded ${commands.length} application (/) commands, including /help and /setadminrole.`);
     } catch (error) {
         console.error('❌ [Deploy] Error while deploying commands:', error);
     }
@@ -110,7 +113,7 @@ if (!BOT_TOKEN || !CLIENT_ID) {
     console.log('🔑 [Login] Attempting to log in...');
     client.login(BOT_TOKEN)
         .catch(error => {
-            console.error("❌ [Login] Failed to connect to Discord:", error);
+            console.error('❌ [Login] Failed to connect to Discord:', error);
         });
 }
 
