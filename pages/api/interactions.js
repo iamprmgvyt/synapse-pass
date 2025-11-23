@@ -2,9 +2,9 @@ import { verifyKey } from 'discord-interactions';
 import connectToDatabase from '../../lib/mongodb';
 import GuildConfig from '../../models/GuildConfig';
 
-// Helper: Check permissions (Administrator OR Custom Admin Role)
-// Checks against the member's permissions bitmask and the stored adminRoleId.
-function hasPermission(member, requiredPermission, guildConfig) {
+// Helper: Check permissions (Administrator ONLY)
+// Since /setadminrole is removed, we only check for the Administrator permission bit (8).
+function hasPermission(member, requiredPermission) {
     const memberPermissions = BigInt(member.permissions); 
     const ADMINISTRATOR = BigInt(8); 
 
@@ -13,18 +13,12 @@ function hasPermission(member, requiredPermission, guildConfig) {
         return true;
     }
 
-    // 2. Check if the command requires the custom Admin Role 
-    if (requiredPermission === 'CUSTOM_ADMIN_ROLE' && guildConfig && guildConfig.adminRoleId) {
-        // Check if the member has the configured adminRoleId
-        return member.roles.includes(guildConfig.adminRoleId);
-    }
-    
-    // 3. For public commands (like /help), no check is needed (handled by Discord client-side)
+    // 2. Public commands are allowed (used for /help)
     if (requiredPermission === 'PUBLIC') {
         return true;
     }
 
-    // Default fail state if none of the above criteria are met
+    // Default fail state 
     return false;
 }
 
@@ -63,8 +57,8 @@ export default async function handler(req, res) {
   if (interaction.type === 2) {
       await connectToDatabase();
       const { member, guild_id, data } = interaction;
-      // Fetch config early for permission checks
-      const guildConfig = await GuildConfig.findOne({ guildId: guild_id });
+      // Fetch config is now only needed for saving, not permission checks
+      // const guildConfig = await GuildConfig.findOne({ guildId: guild_id }); // Removed as adminRoleId is not used
 
       let responseContent;
 
@@ -78,9 +72,8 @@ export default async function handler(req, res) {
               **1. General Command:**
               - \`/help\`: Displays this help information.
               
-              **2. Management Commands (Requires Administrator OR Bot Admin Role):**
-              - \`/setadminrole [role]\`: **(TRUE ADMIN ONLY)** Designates a role that can subsequently run \`/setup-auth\`.
-              - \`/setup-auth [role] [visibility]\`: Sets up the verification system, specifying the role to be assigned upon successful verification, and controls message visibility.
+              **2. Management Command (Requires Administrator Permission):**
+              - \`/setup-auth [role] [visibility]\`: Sets up the verification system, specifying the role to be assigned upon successful verification, and controls message visibility (Public or Private).
           `;
           return res.send({
               type: 4,
@@ -88,31 +81,6 @@ export default async function handler(req, res) {
           });
       }
 
-      // --- COMMAND: /setadminrole ---
-      else if (data.name === 'setadminrole') {
-          // Server-side check ensures only true Admin can set the custom admin role.
-          if (!hasPermission(member, 'ADMINISTRATOR', guildConfig)) {
-              return res.send({
-                  type: 4,
-                  data: { content: '❌ **Permission Denied:** You must have the Administrator permission to designate the bot management role.', flags: 64 }
-              });
-          }
-          
-          const roleId = getOption(data.options, 'role');
-          
-          await GuildConfig.updateOne(
-              { guildId: guild_id },
-              { $set: { adminRoleId: roleId } },
-              { upsert: true }
-          );
-
-          responseContent = `✅ **Success:** Users with the role <@&${roleId}> can now manage the bot (run \`/setup-auth\`).`;
-          return res.send({
-              type: 4,
-              data: { content: responseContent }
-          });
-      } 
-      
       // --- COMMAND: /setup-auth ---
       else if (data.name === 'setup-auth') {
           const roleId = getOption(data.options, 'role');
@@ -122,26 +90,25 @@ export default async function handler(req, res) {
           // Determine flags: 0 for Public, 64 for Ephemeral/Private
           const flags = visibility === 'public' ? 0 : 64;
 
-          // Check Permissions: Administrator OR the Custom Admin Role
-          if (!hasPermission(member, 'CUSTOM_ADMIN_ROLE', guildConfig)) {
-              const requiredRoleDisplay = (guildConfig && guildConfig.adminRoleId) ? `<@&${guildConfig.adminRoleId}>` : 'Not yet configured';
-              deniedMessage = `❌ **Denied:** Requires Administrator permission or the current Bot Management Role (${requiredRoleDisplay}). Please run \`/setadminrole\` first.`;
+          // Check Permissions: Administrator (Permission 8) is required
+          if (!hasPermission(member, 'ADMINISTRATOR')) {
+              deniedMessage = `❌ **Denied:** Requires Administrator permission to run this command.`;
           }
           
           if (deniedMessage) {
               return res.send({ type: 4, data: { content: deniedMessage, flags: 64 } });
           }
           
-          // Save Configuration
+          // Save Configuration (Fetch if not already done)
           await GuildConfig.updateOne(
               { guildId: guild_id },
-              { $set: { roleId: roleId } },
+              { $set: { roleId: roleId, adminRoleId: null } }, // Ensure adminRoleId is nulled out if this command is run
               { upsert: true }
           );
 
           const authLink = getAuthLink(guild_id);
           
-          responseContent = `### ✅ Setup Complete!\n\n**Target Role:** <@&${roleId}>\n**Verification Link:** [Click here to Verify](${authLink})\n\n*Note: Ensure the Bot's role is higher than the target role for role assignment.*`;
+          responseContent = `### ✅ Setup Complete!\n\n**Target Role:** <@&${roleId}>\n**Visibility:** ${visibility === 'public' ? 'Public' : 'Private (Ephemeral)'}\n**Verification Link:** [Click here to Verify](${authLink})\n\n*Note: Ensure the Bot's role is higher than the target role for role assignment.*`;
           
           return res.send({
             type: 4, 
