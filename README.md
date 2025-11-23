@@ -34,7 +34,8 @@ CLIENT_SECRET
 
 Clone Repository & Install:
 
-git clone [https://github.com/iamprmgvyt/synapse-pass-bot.git](https://github.com/iamprmgvyt/synapse-pass-bot.git)
+git clone [https://github.com/iamprmgvyt/synapse-pass.git](https://github.com/iamprmgvyt/synapse-pass.git)
+
 cd synapse-pass-bot
 npm install
 
