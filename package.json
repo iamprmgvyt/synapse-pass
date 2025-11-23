@@ -1,0 +1,28 @@
+{
+  "name": "synapse-pass-bot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "deploy:commands": "node deploy-commands.js",
+    "start:client": "node bot/client.js" 
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "mongoose": "^8.0.0",
+    "discord-interactions": "^3.4.0",
+    "discord.js": "^14.14.1",
+    "express": "^4.18.2" 
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.0.0",
+    "dotenv": "^16.3.1"
+  }
+}
+
