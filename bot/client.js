@@ -11,11 +11,13 @@ require('dotenv').config({ path: '../.env.local' });
 const CLIENT_ID = process.env.CLIENT_ID;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// --- COMMAND DEFINITION ---
+// --- COMMAND DEFINITION ĐÃ SỬA ---
 const commands = [
     {
         name: 'setup-auth',
         description: 'Sets up the Synapse Pass Auth Gate for this server.',
+        // ✅ BỔ SUNG: Permission Bit "8" để giới hạn lệnh chỉ cho Administrator
+        default_member_permissions: "8", 
         options: [
             {
                 name: 'role',
@@ -26,7 +28,7 @@ const commands = [
         ],
     },
 ];
-// --------------------------
+// ----------------------------------
 
 // Initialize the REST client for command deployment
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
@@ -65,7 +67,7 @@ client.on('ready', async () => {
     client.user.setActivity('Secure Verification Gateway', { type: ActivityType.Playing });
     client.user.setStatus('online');
     
-    // Deploy commands on startup
+    // Deploy commands on startup (Sẽ đăng ký lại quyền Admin ở đây)
     await deployCommands(); 
 });
 
