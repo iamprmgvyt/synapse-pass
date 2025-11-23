@@ -36,6 +36,12 @@ const getAuthLink = (guildId) => {
     return `${baseUrl}/api/auth/login?guild_id=${guildId}`;
 };
 
+// Helper: Safely find option value
+const getOption = (options, name) => {
+    const option = options.find(opt => opt.name === name);
+    return option ? option.value : null;
+};
+
 export default async function handler(req, res) {
   const signature = req.headers['x-signature-ed25519'];
   const timestamp = req.headers['x-signature-timestamp'];
@@ -74,7 +80,7 @@ export default async function handler(req, res) {
               
               **2. Management Commands (Requires Administrator OR Bot Admin Role):**
               - \`/setadminrole [role]\`: **(TRUE ADMIN ONLY)** Designates a role that can subsequently run \`/setup-auth\`.
-              - \`/setup-auth [role]\`: Sets up the verification system, specifying the role to be assigned upon successful verification.
+              - \`/setup-auth [role] [visibility]\`: Sets up the verification system, specifying the role to be assigned upon successful verification, and controls message visibility.
           `;
           return res.send({
               type: 4,
@@ -92,7 +98,7 @@ export default async function handler(req, res) {
               });
           }
           
-          const roleId = data.options[0].value;
+          const roleId = getOption(data.options, 'role');
           
           await GuildConfig.updateOne(
               { guildId: guild_id },
@@ -109,8 +115,12 @@ export default async function handler(req, res) {
       
       // --- COMMAND: /setup-auth ---
       else if (data.name === 'setup-auth') {
-          const roleId = data.options[0].value;
+          const roleId = getOption(data.options, 'role');
+          const visibility = getOption(data.options, 'visibility') || 'private'; // Default to private/ephemeral
           let deniedMessage = null; 
+
+          // Determine flags: 0 for Public, 64 for Ephemeral/Private
+          const flags = visibility === 'public' ? 0 : 64;
 
           // Check Permissions: Administrator OR the Custom Admin Role
           if (!hasPermission(member, 'CUSTOM_ADMIN_ROLE', guildConfig)) {
@@ -137,7 +147,7 @@ export default async function handler(req, res) {
             type: 4, 
             data: {
               content: responseContent,
-              flags: 64 
+              flags: flags // Use calculated visibility flags
             }
           });
       }
