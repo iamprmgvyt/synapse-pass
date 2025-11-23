@@ -1,16 +1,16 @@
-# 🔑 Synapse Pass: Secure OAuth2 Verification Gate for Discord
+🔑 Synapse Pass: Secure OAuth2 Verification Gate for Discord
 
-This project is Synapse Pass, a secure and scalable OAuth2 authentication gateway for Discord servers, built on a Serverless Next.js architecture and MongoDB.
+Synapse Pass is a secure, scalable OAuth2 authentication gateway for Discord servers, built on a Serverless Next.js architecture and MongoDB.
 
 ✨ Key Features
 
-🛡️ Secure OAuth2 Verification: Uses the standard Discord OAuth2 authorization flow to verify user identity without requiring passwords.
+🛡️ Secure OAuth2 Verification: Utilizes the standard Discord OAuth2 authorization flow to verify user identity securely without passwords.
 
-🔗 Slash Command Setup: Easily configure the verification role using the /setup-auth command (Administrator only).
+🔗 Slash Command Setup: Easily configure verification roles using the /setup-auth command (Restricted to Administrators).
 
-🌐 Serverless Deployment: Optimized for Vercel (Next.js API Routes) and MongoDB Atlas for high scalability.
+🌐 Serverless Deployment: Optimized for Vercel (Next.js API Routes) and MongoDB Atlas for high scalability and minimal maintenance.
 
-🤖 Optional Bot Client: Includes a lightweight bot client (using bot/client.js) for maintaining presence on Render or other WebSocket services.
+🤖 Optional Bot Client: Includes a lightweight bot client (bot/client.js) to maintain online presence on Render or other WebSocket-compatible hosting services.
 
 🚀 Quick Local Start
 
@@ -30,18 +30,17 @@ PUBLIC_KEY
 
 CLIENT_SECRET
 
-# 🛠️ Setup
+🛠️ Setup
 
-# Clone Repository & Install:
+Clone Repository & Install:
 
-git clone [click here](https://github.com/iamprmgvyt/synapse-pass.git)
-
+git clone [https://github.com/iamprmgvyt/synapse-pass.git](https://github.com/iamprmgvyt/synapse-pass.git)
 cd synapse-pass-bot
 npm install
 
 
 Configure Environment:
-Ensure your .env.local file contains all necessary keys, including MONGODB_URI and the full OAuth2 callback URL, REDIRECT_URI.
+Create a .env.local file in the root directory and ensure it contains all necessary keys, including MONGODB_URI and the full OAuth2 callback URL as REDIRECT_URI.
 
 Core Operational Commands:
 
@@ -59,9 +58,9 @@ Local Development
 
 npm run deploy:commands
 
-Registers the Slash Command (/setup-auth) with the Discord API.
+Registers Slash Commands (/setup-auth) with Discord API.
 
-MUST run after command changes
+MUST run after modifying commands
 
 npm run start:client
 
@@ -69,11 +68,11 @@ Starts the Discord Bot Client (bot/client.js)
 
 Maintain Bot Connection (WebSocket)
 
-# ⚙️ Architecture & Logic Flow
+⚙️ Architecture & Logic Flow
 
-The project is split into two main components: the Serverless API (Next.js) and the Bot Client (Discord.js).
+The project is architected into two primary components: the Serverless API (Next.js) and the Bot Client (Discord.js).
 
-# 1. 🌐 OAuth2 Flow and Serverless API (Next.js)
+1. 🌐 OAuth2 Flow and Serverless API (Next.js)
 
 File Endpoint
 
@@ -87,7 +86,7 @@ pages/api/interactions.js
 
 POST
 
-Handles the Slash Command (/setup-auth). Verifies the security signature and saves GuildID & RoleID to MongoDB.
+Handles Slash Commands (/setup-auth). Verifies security signatures and saves GuildID & RoleID configuration to MongoDB.
 
 PUBLIC_KEY
 
@@ -95,7 +94,7 @@ pages/api/auth/login.js
 
 GET
 
-Initiates the OAuth2 flow. Redirects the user to Discord. Embeds the guild_id into the state parameter.
+Initiates OAuth2 Flow. Redirects users to Discord authorization page. Embeds guild_id into the state parameter for context preservation.
 
 CLIENT_ID, REDIRECT_URI
 
@@ -103,7 +102,7 @@ pages/api/auth/callback.js
 
 GET
 
-Core Authentication Logic. Exchanges the code for UserID. Uses the state (GuildID) to fetch RoleID from MongoDB. Calls Discord API to assign the role to the user (using BOT_TOKEN).
+Core Authentication Logic. Exchanges authorization code for UserID. Retrieves configured RoleID from MongoDB using state (GuildID). Calls Discord API to assign the role to the user (using BOT_TOKEN).
 
 BOT_TOKEN, CLIENT_SECRET
 
@@ -111,17 +110,16 @@ pages/success.js / pages/error.js
 
 GET
 
-Landing page to show successful or failed verification results.
+Landing pages to display successful verification or error messages to the user.
 
 -
 
-# 2. 🤖 Bot Client (bot/client.js)
+2. 🤖 Bot Client (bot/client.js)
 
-The bot/client.js file is responsible for maintaining the Bot's WebSocket connection to Discord, setting its presence, and automatically deploying commands on startup.
+The bot/client.js script is responsible for maintaining the Bot's WebSocket connection to Discord (keeping it "Online"), setting its status presence, and automatically deploying commands upon startup.
 
-Note: The /setup-auth command is restricted to Administrators in this file using default_member_permissions: "8".
+Note: The /setup-auth command is explicitly restricted to users with Administrator permissions within this file using default_member_permissions: "8".
 
-# 🤝 Contact & Support
+🤝 Contact & Support
 
-If you have any questions or require support, please join our support server:
-[Discord Support](https://discord.gg/RsNqWRmsZE)
+If you have any questions, encounter issues, or require assistance, please join our dedicated support server:
