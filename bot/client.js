@@ -1,117 +1,138 @@
 // client.js
-// Script này chạy Discord Bot Client để giữ bot online và đăng ký lệnh.
-// This script runs the Discord Bot Client to keep the bot online and register commands.
+// This script initializes the Discord Bot Client to maintain the WebSocket connection
+// and registers Slash Commands globally. It runs alongside the Next.js server.
 
 const { Client, GatewayIntentBits, ActivityType, REST, Routes } = require('discord.js');
 const express = require('express'); 
 
-// Tải biến môi trường từ file .env.local
-// Load environment variables from the local file
+// Load environment variables
 require('dotenv').config({ path: './.env.local' }); 
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// --- ĐỊNH NGHĨA LỆNH (COMMAND DEFINITIONS) ---
+// --- COMMAND DEFINITIONS ---
 const commands = [
     {
         name: 'setup-auth',
-        description: 'Sets up the Synapse Pass Auth Gate for this server. (Thiết lập cổng xác minh)',
-        // QUAN TRỌNG: Chỉ cho phép Quản trị viên (Permission 8) sử dụng lệnh này
-        // IMPORTANT: Only allow Administrator (Permission 8) to use this command
+        description: 'Sets up the Synapse Pass Auth Gate for this server.',
+        // PERMISSION ENFORCEMENT: "8" is the required bit for ADMINISTRATOR.
         default_member_permissions: "8",
         options: [
             {
                 name: 'role',
-                description: 'The role to assign after verification. (Vai trò sẽ cấp sau khi xác minh)',
-                type: 8, // Type 8 is ROLE option
+                description: 'The role users will receive upon successful verification.',
+                type: 8, // ROLE type
                 required: true,
             },
         ],
     },
     {
         name: 'setadminrole',
-        description: 'Designates a role that can use the /setup-auth command. (Chỉ định role quản lý)',
-        default_member_permissions: "8", // Admin only
+        description: 'Designates a specific role that can manage the Auth Gate.',
+        // Restricted to Administrators initially
+        default_member_permissions: "8",
         options: [
             {
                 name: 'role',
-                description: 'The role to grant permission to. (Vai trò được cấp quyền)',
-                type: 8, // Role type
+                description: 'The role to grant management permissions to.',
+                type: 8, // ROLE type
                 required: true,
             },
         ],
     },
     {
         name: 'help',
-        description: 'Displays information and commands for Synapse Pass Bot. (Hiển thị trợ giúp)',
+        description: 'Displays the list of available commands and usage instructions.',
     },
 ];
 // --------------------------
 
+// Initialize REST client version 10
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
 
+/**
+ * Deploys Slash Commands to the Discord API.
+ */
 async function deployCommands() {
     if (!CLIENT_ID) {
-        console.error('❌ Error: CLIENT_ID is required for command deployment.');
+        console.error('❌ [Error] CLIENT_ID is missing. Cannot deploy commands.');
         return;
     }
+    
     try {
-        console.log('🔄 Starting command registration on Discord API...');
+        console.log('🔄 [Deploy] Started refreshing application (/) commands...');
+        
         await rest.put(
             Routes.applicationCommands(CLIENT_ID),
             { body: commands },
         );
-        console.log('✅ Successfully registered application (/) commands.');
+        
+        console.log(`✅ [Deploy] Successfully reloaded ${commands.length} application (/) commands. (ADMINISTRATOR: setup-auth)`);
     } catch (error) {
-        console.error('❌ Error deploying commands:', error);
+        console.error('❌ [Deploy] Error while deploying commands:', error);
     }
 }
 
+// Create the Client instance with necessary intents
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers // Cần thiết để kiểm tra role/member
+        GatewayIntentBits.GuildMembers 
     ]
 });
 
+// Event: Client Ready
 client.on('ready', async () => {
-    console.log(`🚀 Synapse Pass Client logged in as: ${client.user.tag}`);
-    
-    // Thiết lập trạng thái hoạt động
-    // Set bot presence
-    client.user.setActivity('Secure Verification Gateway', { type: ActivityType.Playing });
+    console.log(`🚀 [Ready] Logged in as: ${client.user.tag}`);
+    console.log(`📊 [Stats] Serving ${client.guilds.cache.size} servers.`);
+
+    // Set Bot Presence
+    client.user.setActivity('Secure Gateways', { type: ActivityType.Watching });
     client.user.setStatus('online');
     
-    // Tự động đăng ký lệnh khi khởi động
-    // Auto-deploy commands on startup
+    // Execute command deployment
     await deployCommands(); 
 });
 
+// Event: Error Handling
+client.on('error', (error) => {
+    console.error('❌ [Client Error] An error occurred:', error);
+});
 
+// Login Process
 if (!BOT_TOKEN || !CLIENT_ID) {
-    console.error("❌ Fatal Error: Missing BOT_TOKEN or CLIENT_ID. Client cannot log in.");
+    console.error("❌ [Fatal] Missing BOT_TOKEN or CLIENT_ID in environment variables.");
+    process.exit(1);
 } else {
+    console.log('🔑 [Login] Attempting to log in...');
     client.login(BOT_TOKEN)
         .catch(error => {
-            console.error("❌ Error connecting to Discord (Check BOT_TOKEN):", error);
+            console.error("❌ [Login] Failed to connect to Discord:", error);
         });
 }
 
 // ----------------------------------------------------------------------
-// ⚡ HEALTH CHECK SERVER (Express) ⚡
+// ⚡ UPTIME MONITORING / HEALTH CHECK (Express Server) ⚡
 // ----------------------------------------------------------------------
 
 const app = express();
 const port = process.env.PORT || 3000; 
 
 app.get('/', (req, res) => {
-    const status = client.isReady() ? 'online' : 'initializing';
-    res.status(200).send(`🤖 Synapse Pass Client Status: ${status}`);
+    const status = client.isReady() ? 'Online' : 'Initializing/Offline';
+    const uptime = Math.floor(process.uptime());
+    
+    res.status(200).json({
+        service: 'Synapse Pass Bot Client',
+        status: status,
+        uptime_seconds: uptime,
+        timestamp: new Date().toISOString()
+    });
 });
 
 app.listen(port, () => {
-    console.log(`🌐 Health Check server listening on port ${port}`);
+    console.log(`🌐 [Health] Health Check server is running on port ${port}`);
 });
