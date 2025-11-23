@@ -1,6 +1,6 @@
- # 🔑 Synapse Pass: Secure OAuth2 Verification Gate for Discord
+# 🔑 Synapse Pass: Secure OAuth2 Verification Gate for Discord
 
- This project is Synapse Pass, a secure and scalable OAuth2 authentication gateway for Discord servers, built on a Serverless Next.js architecture and MongoDB.
+This project is Synapse Pass, a secure and scalable OAuth2 authentication gateway for Discord servers, built on a Serverless Next.js architecture and MongoDB.
 
 ✨ Key Features
 
@@ -30,11 +30,11 @@ PUBLIC_KEY
 
 CLIENT_SECRET
 
-🛠️ Setup
+# 🛠️ Setup
 
-Clone Repository & Install:
+# Clone Repository & Install:
 
-git clone [https://github.com/iamprmgvyt/synapse-pass.git](https://github.com/iamprmgvyt/synapse-pass.git)
+git clone [click here](https://github.com/iamprmgvyt/synapse-pass.git)
 
 cd synapse-pass-bot
 npm install
@@ -69,11 +69,11 @@ Starts the Discord Bot Client (bot/client.js)
 
 Maintain Bot Connection (WebSocket)
 
-⚙️ Architecture & Logic Flow
+# ⚙️ Architecture & Logic Flow
 
 The project is split into two main components: the Serverless API (Next.js) and the Bot Client (Discord.js).
 
-1. 🌐 OAuth2 Flow and Serverless API (Next.js)
+# 1. 🌐 OAuth2 Flow and Serverless API (Next.js)
 
 File Endpoint
 
@@ -115,12 +115,13 @@ Landing page to show successful or failed verification results.
 
 -
 
-2. 🤖 Bot Client (bot/client.js)
+# 2. 🤖 Bot Client (bot/client.js)
 
 The bot/client.js file is responsible for maintaining the Bot's WebSocket connection to Discord, setting its presence, and automatically deploying commands on startup.
 
 Note: The /setup-auth command is restricted to Administrators in this file using default_member_permissions: "8".
 
-🤝 Contact & Support
+# 🤝 Contact & Support
 
-If you have any questions or require support, contact prmgvyt 
+If you have any questions or require support, please join our support server:
+[Discord Support](https://discord.gg/RsNqWRmsZE)
