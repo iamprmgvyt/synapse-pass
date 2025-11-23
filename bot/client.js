@@ -29,7 +29,7 @@ const commands = [
                 name: 'visibility',
                 description: 'Should the setup message be visible to everyone (Public) or only you (Private)?',
                 type: 3, // STRING type
-                required: false,
+                required: true, // <-- Đã thay đổi thành BẮT BUỘC (true)
                 choices: [
                     { name: 'Public', value: 'public' },
                     { name: 'Private (Ephemeral)', value: 'private' }
