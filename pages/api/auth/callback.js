@@ -1,66 +1,125 @@
 import connectToDatabase from '../../../lib/mongodb';
 import GuildConfig from '../../../models/GuildConfig';
+import querystring from 'querystring';
 
+// Discord OAuth2 constants
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+
+// Utility function to determine the base URL
+const getBaseUrl = (req) => {
+    const domain = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL;
+    if (domain) {
+        return domain.endsWith('/') ? domain.slice(0, -1) : domain;
+    }
+    // Fallback for development/local
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    return `${protocol}://${req.headers.host}`;
+};
+
+// API handler
 export default async function handler(req, res) {
-  const { code, state: guildId } = req.query; 
-  
-  if (!code || !guildId) {
-    // Redirect to a custom error page if parameters are missing
-    return res.redirect('/error?message=Missing authentication code or Guild ID.');
-  }
-
-  try {
-    // 1. EXCHANGE CODE FOR ACCESS TOKEN
-    const tokenData = await fetch('https://discord.com/api/oauth2/token', {
-      method: 'POST',
-      body: new URLSearchParams({
-        client_id: process.env.CLIENT_ID,
-        client_secret: process.env.CLIENT_SECRET,
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: process.env.REDIRECT_URI,
-        scope: 'identify guilds.join',
-      }),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    }).then(r => r.json());
-
-    if (tokenData.error) throw new Error(tokenData.error_description || 'Token Exchange Failed');
-
-    // 2. GET USER ID FROM ACCESS TOKEN
-    const user = await fetch('https://discord.com/api/users/@me', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    }).then(r => r.json());
-
-    // 3. RETRIEVE ROLE CONFIG FROM MONGODB
-    await connectToDatabase();
-    const config = await GuildConfig.findOne({ guildId: guildId });
+    const { code, state: guildId, error } = req.query;
     
-    if (!config) {
-      return res.redirect(`/error?message=Server configuration not found for Guild ${guildId}. Please ask the Admin to run /setup-auth.`);
+    // 1. Handle potential error redirect from Discord
+    if (error) {
+        console.error('Discord OAuth Error:', error);
+        return res.redirect(`/error?message=${encodeURIComponent('Discord authorization failed.')}`);
     }
 
-    // 4. ADD ROLE TO USER (Using the BOT's Token for permissions)
-    const roleEndpoint = `https://discord.com/api/guilds/${guildId}/members/${user.id}/roles/${config.roleId}`;
-    
-    const roleRes = await fetch(roleEndpoint, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bot ${process.env.BOT_TOKEN}`, // CRUCIAL: Use the Bot's token to execute the role addition
-        'Content-Length': '0' // Required by Discord API for PUT requests
-      },
-    });
-
-    if (roleRes.status !== 204) {
-      // Role assignment failed (e.g., bot lacks permission, role is too high)
-      const errorText = await roleRes.text();
-      console.error('Role Add Failed:', errorText);
-      return res.redirect(`/error?message=Role assignment failed. Status: ${roleRes.status}. Check bot permissions and role hierarchy.`);
+    // Check for essential parameters
+    if (!code || !guildId) {
+        return res.redirect(`/error?message=${encodeURIComponent('Missing OAuth code or guild ID.')}`);
     }
 
-    // 5. SUCCESS
-    res.redirect('/success'); // Redirect to the success page
-  } catch (error) {
-    console.error('Callback Error:', error);
-    res.redirect(`/error?message=Authentication Failed. ${error.message}`);
-  }
+    const baseUrl = getBaseUrl(req);
+    const redirectUri = `${baseUrl}/api/auth/callback`;
+
+    let userAccessToken;
+    let discordUser;
+
+    try {
+        // --- 2. Exchange Code for Token ---
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: querystring.stringify({
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: redirectUri,
+                scope: 'identify guilds.join',
+            }),
+        });
+        
+        const tokenData = await tokenResponse.json();
+
+        if (tokenData.error) {
+            console.error('Token Exchange Error:', tokenData);
+            return res.redirect(`/error?message=${encodeURIComponent(tokenData.error_description || 'Failed to exchange code for token.')}`);
+        }
+
+        userAccessToken = tokenData.access_token;
+
+        // --- 3. Get User Identity ---
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                Authorization: `Bearer ${userAccessToken}`,
+            },
+        });
+        
+        discordUser = await userResponse.json();
+
+        if (discordUser.id) {
+            console.log(`User ${discordUser.username} (ID: ${discordUser.id}) successfully identified.`);
+        } else {
+            return res.redirect(`/error?message=${encodeURIComponent('Failed to fetch user profile.')}`);
+        }
+
+        // --- 4. Connect to DB and Get Role Config ---
+        await connectToDatabase();
+        const config = await GuildConfig.findOne({ guildId });
+
+        if (!config || !config.verifiedRoleId) {
+            console.warn(`Guild ${guildId} configuration not found or role missing.`);
+            return res.redirect(`/error?message=${encodeURIComponent('Verification role not configured by server administrator.')}`);
+        }
+        
+        // --- 5. Add User to Guild (Guilds.Join Scope) ---
+        // This requires the OAuth2 token (which has the guilds.join scope).
+        const memberAddResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordUser.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bot ${process.env.BOT_TOKEN}`, // Typically requires Bot token for this endpoint
+            },
+            body: JSON.stringify({
+                access_token: userAccessToken,
+                roles: [config.verifiedRoleId] // Assign the role immediately
+            }),
+        });
+
+        const memberAddData = await memberAddResponse.json();
+        
+        // Discord returns 201 (Created) if the user was added, 204 (No Content) if they were already in the guild.
+        if (memberAddResponse.ok || memberAddResponse.status === 201 || memberAddResponse.status === 204) {
+            // Success! The user is now in the guild and has the verified role.
+            console.log(`User ${discordUser.id} successfully joined/updated in guild ${guildId} with role ${config.verifiedRoleId}.`);
+            return res.redirect('/success');
+        } else {
+            console.error('Error adding user to guild/assigning role:', memberAddResponse.status, memberAddData);
+            let errorMessage = 'Failed to add user to server or assign role.';
+            if (memberAddResponse.status === 403) {
+                errorMessage = 'Bot is missing permissions (MANAGE_ROLES) or its role is too low to assign the verified role.';
+            }
+            return res.redirect(`/error?message=${encodeURIComponent(errorMessage)}`);
+        }
+        
+    } catch (e) {
+        console.error('Fatal API Callback Error:', e);
+        return res.redirect(`/error?message=${encodeURIComponent('An unexpected error occurred during the verification process.')}`);
+    }
 }
