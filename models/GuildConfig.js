@@ -1,16 +1,27 @@
-import mongoose from 'mongoose'; // Đã chuyển lại thành cú pháp import
+import mongoose from 'mongoose';
 
-const guildConfigSchema = new mongoose.Schema({
-    guildId: { type: String, required: true, unique: true },
-    // Vai trò được gán sau khi xác minh thành công.
-    verifiedRoleId: { type: String, required: false }, 
-    
-    // ID của Admin đã thiết lập lần cuối.
-    setupAdminId: { type: String, required: true },
-    setupDate: { type: Date, default: Date.now }
-
-    // Các trường liên quan đến mật khẩu đã bị loại bỏ theo yêu cầu.
+// Định nghĩa schema cho cấu hình máy chủ (Guild) Discord
+// Schema này sẽ lưu trữ Guild ID và Role ID cần gán khi người dùng xác thực thành công.
+const GuildConfigSchema = new mongoose.Schema({
+    // ID của máy chủ Discord (Guild ID)
+    guildId: {
+        type: String,
+        required: true,
+        unique: true, // Đảm bảo mỗi máy chủ chỉ có một cấu hình
+    },
+    // ID của vai trò (Role ID) sẽ được gán cho thành viên đã xác thực
+    verifiedRoleId: {
+        type: String,
+        required: true,
+    },
+    // Các trường tùy chọn khác có thể thêm sau này (ví dụ: kênh log)
+    logChannelId: {
+        type: String,
+        required: false,
+    },
+}, { 
+    timestamps: true // Tự động thêm createdAt và updatedAt
 });
 
-// Sử dụng export default cho môi trường Next.js/ES Module
-export default mongoose.models.GuildConfig || mongoose.model('GuildConfig', guildConfigSchema, 'guild_configs');
+// Kiểm tra xem Model đã tồn tại chưa để tránh lỗi khi reload (trong Next.js development)
+export default mongoose.models.GuildConfig || mongoose.model('GuildConfig', GuildConfigSchema);
