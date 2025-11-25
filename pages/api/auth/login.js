@@ -1,52 +1,54 @@
-// Discord OAuth Login Initiator API Route
-// File: pages/api/auth/login.js
+import querystring from 'querystring';
 
-// LƯU Ý QUAN TRỌNG: Bạn cần định nghĩa các biến môi trường này
-// (DISCORD_CLIENT_ID, DISCORD_REDIRECT_URI) trong file .env của dự án.
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "YOUR_DISCORD_CLIENT_ID";
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || "http://localhost:3000/api/auth/callback";
+// Get configuration information from environment variables
+// Đã đổi tên biến để phù hợp với quy ước chung (REDIRECT_URI) và tránh xung đột.
+const CLIENT_ID = process.env.CLIENT_ID || "YOUR_DISCORD_CLIENT_ID";
+const REDIRECT_URI = process.env.REDIRECT_URI || "http://localhost:3000/api/auth/callback";
 
-// Các scopes cần thiết:
-// 'identify': Lấy thông tin người dùng (ID, username).
-// 'guilds': Lấy danh sách servers mà người dùng tham gia (để kiểm tra quyền quản lý).
-// 'guilds.join': (Optional) Nếu bot cần thêm role sau khi xác thực.
-const SCOPES = ['identify', 'guilds']; 
+// The required scopes for this application:
+// 1. 'identify': To get user's basic info (ID, username).
+// 2. 'guilds': To check if the user is an administrator of the target guild.
+// 3. 'guilds.join': NEW! To automatically join the user to the target guild.
+const SCOPES = ['identify', 'guilds', 'guilds.join'];
 
-// Chúng ta sẽ dùng trạng thái (state) để lưu Guild ID, để biết người dùng
-// đang đăng nhập cho server nào sau khi Discord trả về phản hồi.
-// Điều này giúp ngăn chặn các yêu cầu giả mạo CSRF và gắn kết quá trình đăng nhập
-// với server cụ thể.
+// Helper: Encode state to include Guild ID
 const encodeState = (guildId) => {
-    // Trong môi trường thực tế, bạn nên mã hóa thêm một token ngẫu nhiên để chống CSRF.
-    // Ở đây, ta chỉ mã hóa Guild ID để đơn giản hóa.
-    return btoa(JSON.stringify({ guildId, timestamp: Date.now() }));
+    // In a real application, you would add a CSRF token here.
+    // We are simply encoding the Guild ID for context.
+    const data = { guildId: guildId };
+    return Buffer.from(JSON.stringify(data)).toString('base64');
 };
 
 /**
- * Xử lý yêu cầu HTTP để khởi tạo quá trình Discord OAuth2.
- * Đọc guild_id từ truy vấn và chuyển hướng người dùng đến Discord.
- * * @param {import('http').IncomingMessage} req 
- * @param {import('http').ServerResponse} res
+ * Handles Discord OAuth2 Login initiation requests.
+ * Reads the guild_id from the query and redirects the user to Discord.
+ * @param {import('next').NextApiRequest} req 
+ * @param {import('next').NextApiResponse} res
  */
 export default function handler(req, res) {
-    // 1. Lấy Guild ID từ truy vấn
     const { guild_id } = req.query;
 
     if (!guild_id) {
-        return res.status(400).json({ 
-            success: false, 
-            message: "Missing 'guild_id' query parameter." 
-        });
+        // Fallback or error handling if guild_id is missing
+        return res.status(400).send("Missing guild_id parameter.");
     }
 
-    // 2. Tạo chuỗi state (chứa Guild ID)
+    // Encode the guild_id into the state parameter
     const state = encodeState(guild_id);
 
-    // 3. Xây dựng URL Discord OAuth2
-    const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=${SCOPES.join('%20')}&state=${state}&prompt=consent`;
+    const params = {
+        client_id: CLIENT_ID, // Đã đổi thành CLIENT_ID
+        redirect_uri: REDIRECT_URI, // Đã đổi thành REDIRECT_URI
+        response_type: 'code',
+        // Join scopes with a space (automatically handled by querystring)
+        scope: SCOPES.join(' '),
+        state: state,
+    };
 
-    // 4. Chuyển hướng người dùng
-    console.log(`Redirecting user to Discord URL: ${discordAuthUrl}`);
+    // Construct the final Discord Authorization URL
+    const discordAuthUrl = `https://discord.com/oauth2/authorize?${querystring.stringify(params)}`;
+
+    // Redirect the user to the Discord authorization page
     res.setHeader('Location', discordAuthUrl);
     res.status(302).end();
 }
