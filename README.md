@@ -2,11 +2,17 @@
 
 Synapse Pass is a secure, scalable OAuth2 authentication gateway for Discord servers, built on a Serverless Next.js architecture and MongoDB.
 
+⚖️ License
+
+This project is licensed under the MIT License. See the LICENSE.md file for full details.
+
 ✨ Key Features
 
 🛡️ Secure OAuth2 Verification: Utilizes the standard Discord OAuth2 authorization flow to verify user identity securely without passwords.
 
 🔗 Slash Command Setup: Easily configure verification roles using the /setup-auth command (Restricted to Administrators).
+
+💾 Member Backup/Restore: Commands for /backup-members and /restore-members to securely manage verified member IDs.
 
 🌐 Serverless Deployment: Optimized for Vercel (Next.js API Routes) and MongoDB Atlas for high scalability and minimal maintenance.
 
@@ -34,7 +40,7 @@ CLIENT_SECRET
 
 Clone Repository & Install:
 
-git clone [https://github.com/iamprmgvyt/synapse-pass.git](https://github.com/iamprmgvyt/synapse-pass.git)
+git clone [https://github.com/iamprmgvyt/synapse-pass-bot.git](https://github.com/iamprmgvyt/synapse-pass-bot.git)
 cd synapse-pass-bot
 npm install
 
@@ -68,6 +74,23 @@ Starts the Discord Bot Client (bot/client.js)
 
 Maintain Bot Connection (WebSocket)
 
+⚠️ Bot Invitation & Required Permissions (Scope bot)
+
+Để bot có thể thực hiện việc gán vai trò (/setup-auth) và phục hồi thành viên (/restore-members), bot cần phải được mời vào máy chủ với các quyền sau:
+
+Scopes Bắt buộc: bot và applications.commands.
+
+Permissions Bắt buộc: Manage Roles (Quản lý Vai trò), Administrator (Quản trị viên) HOẶC ít nhất là quyền để bot có thể gán vai trò mục tiêu.
+
+Đường dẫn mời Bot Mẫu:
+
+Bạn phải thay thế YOUR_CLIENT_ID bằng CLIENT_ID của bot bạn.
+
+[https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=268435456](https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=268435456)
+
+
+(Quyền 268435456 tương đương với Administrator - quyền cao nhất, hoặc bạn có thể chọn quyền thấp hơn như Manage Roles nếu bạn muốn hạn chế quyền của bot.)
+
 ⚙️ Architecture & Logic Flow
 
 The project is architected into two primary components: the Serverless API (Next.js) and the Bot Client (Discord.js).
@@ -86,7 +109,7 @@ pages/api/interactions.js
 
 POST
 
-Handles Slash Commands (/setup-auth). Verifies security signatures and saves GuildID & RoleID configuration to MongoDB.
+Handles Slash Commands (/setup-auth, /backup-members, /restore-members). Verifies security signatures and saves GuildID & RoleID configuration to MongoDB.
 
 PUBLIC_KEY
 
@@ -122,4 +145,4 @@ Note: The /setup-auth command is explicitly restricted to users with Administrat
 
 🤝 Contact & Support
 
-If you have any questions, encounter issues, or require assistance, please join our dedicated support server:
+If you have any questions, encounter issues, or require assistance, please DM prmgvyt
