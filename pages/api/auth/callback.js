@@ -1,125 +1,161 @@
+import querystring from 'querystring';
 import connectToDatabase from '../../../lib/mongodb';
 import GuildConfig from '../../../models/GuildConfig';
-import querystring from 'querystring';
 
-// Discord OAuth2 constants
+// --- Cấu hình Biến Môi trường & Constants ---
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const BOT_TOKEN = process.env.BOT_TOKEN; 
+const DISCORD_API_BASE = 'https://discord.com/api/v10';
+const SCOPE_JOIN = 'guilds.join'; 
 
-// Utility function to determine the base URL
+// --- Hàm tiện ích ---
+
+/**
+ * Xác định URL cơ sở của ứng dụng.
+ * @param {import('next').NextApiRequest} req 
+ * @returns {string} Base URL
+ */
 const getBaseUrl = (req) => {
     const domain = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL;
     if (domain) {
         return domain.endsWith('/') ? domain.slice(0, -1) : domain;
     }
-    // Fallback for development/local
+    // Fallback cho môi trường phát triển/local
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     return `${protocol}://${req.headers.host}`;
 };
 
-// API handler
+/**
+ * Giải mã tham số state (Base64) để lấy Guild ID và các dữ liệu khác.
+ * @param {string} state - Base64 encoded string
+ * @returns {{guildId: string}} Decoded state object
+ */
+const decodeState = (state) => {
+    try {
+        const decodedString = Buffer.from(state, 'base64').toString('utf-8');
+        return JSON.parse(decodedString);
+    } catch (e) {
+        console.error("Error decoding state:", e);
+        return null;
+    }
+};
+
+/**
+ * Xử lý luồng OAuth2 Callback.
+ * @param {import('next').NextApiRequest} req 
+ * @param {import('next').NextApiResponse} res
+ */
 export default async function handler(req, res) {
-    const { code, state: guildId, error } = req.query;
-    
-    // 1. Handle potential error redirect from Discord
-    if (error) {
-        console.error('Discord OAuth Error:', error);
-        return res.redirect(`/error?message=${encodeURIComponent('Discord authorization failed.')}`);
+    const { code, state, error: discordError } = req.query;
+
+    // 1. Xử lý lỗi từ Discord và State
+    if (discordError || !code) {
+        console.error("Discord returned an error or missing code:", discordError);
+        return res.redirect(`/error?message=${encodeURIComponent('User denied authorization or missing authorization code.')}`);
     }
 
-    // Check for essential parameters
-    if (!code || !guildId) {
-        return res.redirect(`/error?message=${encodeURIComponent('Missing OAuth code or guild ID.')}`);
+    const stateData = decodeState(state);
+    if (!stateData || !stateData.guildId) {
+        return res.redirect(`/error?message=${encodeURIComponent('Invalid or missing state parameter (Guild ID).')}`);
     }
 
+    const guildId = stateData.guildId;
     const baseUrl = getBaseUrl(req);
     const redirectUri = `${baseUrl}/api/auth/callback`;
-
-    let userAccessToken;
-    let discordUser;
+    let userId = null;
 
     try {
-        // --- 2. Exchange Code for Token ---
-        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+        // 2. Trao đổi Code lấy Access Token (Server-to-Server)
+        const tokenResponse = await fetch(`${DISCORD_API_BASE}/oauth2/token`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: querystring.stringify({
                 client_id: CLIENT_ID,
                 client_secret: CLIENT_SECRET,
                 grant_type: 'authorization_code',
                 code: code,
                 redirect_uri: redirectUri,
-                scope: 'identify guilds.join',
+                // Đảm bảo có đủ 3 scopes: 'identify', 'guilds', 'guilds.join'
+                scope: 'identify guilds guilds.join', 
             }),
         });
-        
-        const tokenData = await tokenResponse.json();
 
-        if (tokenData.error) {
-            console.error('Token Exchange Error:', tokenData);
-            return res.redirect(`/error?message=${encodeURIComponent(tokenData.error_description || 'Failed to exchange code for token.')}`);
+        if (!tokenResponse.ok) {
+            const errorText = await tokenResponse.text();
+            console.error("Token exchange failed:", errorText);
+            throw new Error('Failed to exchange authorization code for tokens.');
         }
 
-        userAccessToken = tokenData.access_token;
-
-        // --- 3. Get User Identity ---
-        const userResponse = await fetch('https://discord.com/api/users/@me', {
-            headers: {
-                Authorization: `Bearer ${userAccessToken}`,
-            },
+        const tokens = await tokenResponse.json();
+        const accessToken = tokens.access_token;
+        const scopes = tokens.scope.split(' ');
+        
+        // 3. Lấy thông tin người dùng (UserID)
+        const userResponse = await fetch(`${DISCORD_API_BASE}/users/@me`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` },
         });
-        
-        discordUser = await userResponse.json();
 
-        if (discordUser.id) {
-            console.log(`User ${discordUser.username} (ID: ${discordUser.id}) successfully identified.`);
-        } else {
-            return res.redirect(`/error?message=${encodeURIComponent('Failed to fetch user profile.')}`);
+        if (!userResponse.ok) {
+            throw new Error('Failed to fetch user information.');
         }
 
-        // --- 4. Connect to DB and Get Role Config ---
+        const user = await userResponse.json();
+        userId = user.id;
+
+        // 4. Kết nối DB và lấy Role ID đã cấu hình
         await connectToDatabase();
-        const config = await GuildConfig.findOne({ guildId });
+        const config = await GuildConfig.findOne({ guildId: guildId });
 
         if (!config || !config.verifiedRoleId) {
-            console.warn(`Guild ${guildId} configuration not found or role missing.`);
-            return res.redirect(`/error?message=${encodeURIComponent('Verification role not configured by server administrator.')}`);
+            throw new Error('Server verification role not configured (verifiedRoleId missing in database).');
+        }
+        const roleId = config.verifiedRoleId;
+
+
+        // 5. Tự động thêm thành viên vào Guild (sử dụng scope 'guilds.join')
+        // Endpoint này yêu cầu BOT_TOKEN để thực hiện hành động PUT
+        if (scopes.includes(SCOPE_JOIN)) {
+            const joinResponse = await fetch(`${DISCORD_API_BASE}/guilds/${guildId}/members/${userId}`, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': `Bot ${BOT_TOKEN}`, 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ access_token: accessToken }),
+            });
+            
+            // 201: created/joined, 204: already exists. 409: đã tồn tại (ignored)
+            if (!joinResponse.ok && joinResponse.status !== 204 && joinResponse.status !== 409) {
+                const errorText = await joinResponse.text();
+                console.warn(`[Guild Join] Failed for User ${userId} in Guild ${guildId}. Status: ${joinResponse.status}. Error: ${errorText}`);
+                // Vẫn tiếp tục gán role
+            } else if (joinResponse.status === 201) {
+                console.log(`User ${userId} successfully joined Guild ${guildId}.`);
+            }
         }
         
-        // --- 5. Add User to Guild (Guilds.Join Scope) ---
-        // This requires the OAuth2 token (which has the guilds.join scope).
-        const memberAddResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordUser.id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bot ${process.env.BOT_TOKEN}`, // Typically requires Bot token for this endpoint
+        // 6. Gán Vai trò cho thành viên (sử dụng BOT_TOKEN - quyền bot)
+        const roleAssignmentResponse = await fetch(`${DISCORD_API_BASE}/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
+            method: 'PUT', // PUT để thêm role
+            headers: { 
+                'Authorization': `Bot ${BOT_TOKEN}`,
             },
-            body: JSON.stringify({
-                access_token: userAccessToken,
-                roles: [config.verifiedRoleId] // Assign the role immediately
-            }),
         });
 
-        const memberAddData = await memberAddResponse.json();
-        
-        // Discord returns 201 (Created) if the user was added, 204 (No Content) if they were already in the guild.
-        if (memberAddResponse.ok || memberAddResponse.status === 201 || memberAddResponse.status === 204) {
-            // Success! The user is now in the guild and has the verified role.
-            console.log(`User ${discordUser.id} successfully joined/updated in guild ${guildId} with role ${config.verifiedRoleId}.`);
-            return res.redirect('/success');
-        } else {
-            console.error('Error adding user to guild/assigning role:', memberAddResponse.status, memberAddData);
-            let errorMessage = 'Failed to add user to server or assign role.';
-            if (memberAddResponse.status === 403) {
-                errorMessage = 'Bot is missing permissions (MANAGE_ROLES) or its role is too low to assign the verified role.';
-            }
-            return res.redirect(`/error?message=${encodeURIComponent(errorMessage)}`);
+        if (!roleAssignmentResponse.ok) {
+            const errorText = await roleAssignmentResponse.text();
+            console.error(`Role assignment failed: Status ${roleAssignmentResponse.status}. Error: ${errorText}`);
+            throw new Error('Failed to assign the verification role. Check bot permissions (Manage Roles) and hierarchy.');
         }
-        
-    } catch (e) {
-        console.error('Fatal API Callback Error:', e);
-        return res.redirect(`/error?message=${encodeURIComponent('An unexpected error occurred during the verification process.')}`);
+
+        // 7. Hoàn tất thành công
+        console.log(`User ${userId} successfully verified and assigned role ${roleId} in guild ${guildId}.`);
+        return res.redirect(`/success?guild=${guildId}`);
+
+    } catch (error) {
+        // Xử lý lỗi chung và chuyển hướng đến trang lỗi
+        console.error("Authentication/Role Assignment Error:", error.message);
+        return res.redirect(`/error?message=${encodeURIComponent(error.message)}&user=${userId}`);
     }
 }
