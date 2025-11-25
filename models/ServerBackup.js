@@ -1,45 +1,33 @@
-// models/ServerBackup.js
-// ES Module syntax for use with Next.js API routes
-
 import mongoose from 'mongoose';
 
-// Defines the structure for storing verified member ID backups.
-const ServerBackupSchema = new mongoose.Schema({
-    // Discord Guild ID (Server ID)
-    guildId: { 
-        type: String, 
-        required: true 
-    },
-    // ID of the Admin who initiated this backup.
-    adminId: { 
-        type: String, 
-        required: true 
-    }, 
-    // Name of the server at the time of backup.
-    serverName: { 
-        type: String, 
-        required: true 
-    },
-    // Array of verified members' IDs and verification time.
-    verifiedMembers: [
-        {
-            discordId: { type: String, required: true },
-            verifiedAt: { type: Date, default: Date.now }
-        }
-    ],
-    // Date of the last backup.
-    lastBackup: { 
-        type: Date, 
-        default: Date.now 
-    }
-}, {
-    timestamps: true // Adds createdAt and updatedAt timestamps
+// Schema cho mỗi thành viên đã được sao lưu
+const verifiedMemberSchema = new mongoose.Schema({
+    discordId: { type: String, required: true },
+    verifiedAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+// Schema chính cho việc cấu hình Server Backup
+const serverBackupSchema = new mongoose.Schema({
+    // ID của server Discord
+    guildId: { type: String, required: true, unique: true }, 
+
+    // ID của Admin đã thực hiện lệnh backup lần cuối
+    adminId: { type: String, required: true },
+    
+    // Tên của server tại thời điểm backup
+    serverName: { type: String, required: true },
+    
+    // Mảng chứa các ID thành viên đã xác minh
+    verifiedMembers: [verifiedMemberSchema],
+    
+    // Thời gian backup cuối cùng
+    lastBackup: { type: Date, default: Date.now }
 });
 
-// Index to ensure each admin can only have one backup record per guild.
-ServerBackupSchema.index({ guildId: 1, adminId: 1 }, { unique: true });
+// Tạo index kết hợp để truy vấn nhanh hơn
+serverBackupSchema.index({ guildId: 1, adminId: 1 }, { unique: true });
 
-// Check if the model already exists to prevent re-compilation.
-const ServerBackup = mongoose.models.ServerBackup || mongoose.model('ServerBackup', ServerBackupSchema, 'server_backups');
+// Tái sử dụng model đã tồn tại nếu có, nếu không thì tạo mới
+const ServerBackup = mongoose.models.ServerBackup || mongoose.model('ServerBackup', serverBackupSchema, 'server_backups');
 
 export default ServerBackup;
