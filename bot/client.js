@@ -2,10 +2,13 @@
 // This script initializes the Discord Bot Client to maintain the WebSocket connection
 // and registers Slash Commands globally. It runs alongside the Next.js server.
 
-const { Client, GatewayIntentBits, ActivityType, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, REST, Routes, InteractionResponseType } = require('discord.js');
 const express = require('express'); 
 
-// Load environment variables
+// Tải mô-đun xử lý tương tác
+const { handleInteraction } = require('./interactionCreate'); 
+
+// Load environment variables from the standard .env file
 require('dotenv').config({ path: './.env' }); 
 
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -96,6 +99,13 @@ client.on('ready', async () => {
     await deployCommands(); 
 });
 
+// ----------------------------------------------------------------------
+// 📩 INTERACTION HANDLER (Using external handler) 📩
+// ----------------------------------------------------------------------
+
+// Gắn hàm xử lý tương tác đã được tách ra từ ./interactionCreate.js
+client.on('interactionCreate', handleInteraction);
+
 // Event: Error Handling
 client.on('error', (error) => {
     console.error('❌ [Client Error] An error occurred:', error);
@@ -114,23 +124,22 @@ if (!BOT_TOKEN || !CLIENT_ID) {
 }
 
 // ----------------------------------------------------------------------
-// 💓 HEARTBEAT LOGIC AND LOAD SIMULATION (TO KEEP THE BOT ACTIVE) 💓
+// 💓 HEARTBEAT LOGIC VÀ MÔ PHỎNG TẢI (ĐÃ TĂNG KHOẢNG THỜI GIAN LÊN 2 GIÂY) 💓
 // ----------------------------------------------------------------------
 
 /**
- * Executes a blocking busy loop to simulate CPU load for a short duration (~30ms).
- * This creates a CPU spike to prevent the container from scaling down due to inactivity.
+ * Executes a blocking busy loop to simulate CPU load for a very short duration (~5ms).
+ * This minimal spike prevents the container from sleeping due to inactivity.
+ * (5ms busy time / 2000ms interval = 0.25% CPU load - Tăng độ ổn định)
  */
 function simulateLoad() {
-    // Estimated time to occupy the CPU (e.g., 30ms)
-    // This value is tuned to create a small CPU spike every 2 seconds.
+    // Busy time: 5ms
     const startTime = process.hrtime.bigint();
-    const durationMs = 30; 
+    const durationMs = 5; 
 
-    // Blocking calculation loop to monopolize the Node.js thread
+    // Calculation loop to occupy the Node.js thread
     let sum = 0;
     while (true) {
-        // Perform a light, non-optimizable mathematical calculation
         sum += Math.sqrt(Math.random() * 1000000); 
 
         // Check elapsed time
@@ -139,14 +148,15 @@ function simulateLoad() {
             break;
         }
     }
-    // Simple check to prevent compiler optimization from removing 'sum'
+    // Simple check to prevent dead code elimination by compiler
     if (sum === -1) console.log(sum); 
 }
 
 
-// Send a heartbeat and simulate load every 2 seconds (2000ms).
+// Gửi heartbeat và mô phỏng tải MỌI 2 GIÂY (2000ms).
+const HEARTBEAT_INTERVAL = 2000; // Tăng từ 500ms lên 2000ms để ổn định hơn
 setInterval(() => {
-    // 1. Execute CPU load simulation to create the ~3% spike
+    // 1. Execute CPU load simulation (~1% spike)
     simulateLoad(); 
 
     // 2. Logging Heartbeat and Bot Status
@@ -165,9 +175,9 @@ setInterval(() => {
         }
     }
 
-    // Log the heartbeat and simulated load information
-    console.log(`[Heartbeat] ${emojiStatus} Bot Status: ${detailedStatus}. Uptime: ${Math.floor(process.uptime())}s. Simulated 3% CPU load (Every 2s).`);
-}, 2000); // Set to 2000ms (2 seconds)
+    // Log heartbeat và simulated load info
+    console.log(`[Heartbeat] ${emojiStatus} Bot Status: ${detailedStatus}. Uptime: ${Math.floor(process.uptime())}s. Simulated Load (Every ${HEARTBEAT_INTERVAL}ms).`);
+}, HEARTBEAT_INTERVAL); // Đặt thành 2000ms (2 giây)
 
 // ----------------------------------------------------------------------
 // ⚡ UPTIME MONITORING / HEALTH CHECK (Express Server) ⚡
