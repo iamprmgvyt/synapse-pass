@@ -6,7 +6,7 @@ const { Client, GatewayIntentBits, ActivityType, REST, Routes } = require('disco
 const express = require('express'); 
 
 // Load environment variables
-require('dotenv').config({ path: './.env.local' }); 
+require('dotenv').config({ path: './.env' }); 
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -112,6 +112,62 @@ if (!BOT_TOKEN || !CLIENT_ID) {
             console.error('❌ [Login] Failed to connect to Discord:', error);
         });
 }
+
+// ----------------------------------------------------------------------
+// 💓 HEARTBEAT LOGIC AND LOAD SIMULATION (TO KEEP THE BOT ACTIVE) 💓
+// ----------------------------------------------------------------------
+
+/**
+ * Executes a blocking busy loop to simulate CPU load for a short duration (~30ms).
+ * This creates a CPU spike to prevent the container from scaling down due to inactivity.
+ */
+function simulateLoad() {
+    // Estimated time to occupy the CPU (e.g., 30ms)
+    // This value is tuned to create a small CPU spike every 2 seconds.
+    const startTime = process.hrtime.bigint();
+    const durationMs = 30; 
+
+    // Blocking calculation loop to monopolize the Node.js thread
+    let sum = 0;
+    while (true) {
+        // Perform a light, non-optimizable mathematical calculation
+        sum += Math.sqrt(Math.random() * 1000000); 
+
+        // Check elapsed time
+        const elapsedTimeMs = Number(process.hrtime.bigint() - startTime) / 1000000;
+        if (elapsedTimeMs >= durationMs) {
+            break;
+        }
+    }
+    // Simple check to prevent compiler optimization from removing 'sum'
+    if (sum === -1) console.log(sum); 
+}
+
+
+// Send a heartbeat and simulate load every 2 seconds (2000ms).
+setInterval(() => {
+    // 1. Execute CPU load simulation to create the ~3% spike
+    simulateLoad(); 
+
+    // 2. Logging Heartbeat and Bot Status
+    const isReady = client.isReady();
+    const emojiStatus = isReady ? '🟢' : '🔴';
+    let detailedStatus = 'Initializing...'; 
+
+    if (isReady && client.user) {
+        const statusText = client.user.presence?.status || 'Online'; 
+        const activity = client.user.presence?.activities?.[0];
+
+        detailedStatus = `${statusText.toUpperCase()}`;
+        if (activity) {
+            const typeString = ActivityType[activity.type];
+            detailedStatus += ` | ${typeString.charAt(0).toUpperCase() + typeString.slice(1)} ${activity.name}`;
+        }
+    }
+
+    // Log the heartbeat and simulated load information
+    console.log(`[Heartbeat] ${emojiStatus} Bot Status: ${detailedStatus}. Uptime: ${Math.floor(process.uptime())}s. Simulated 3% CPU load (Every 2s).`);
+}, 2000); // Set to 2000ms (2 seconds)
 
 // ----------------------------------------------------------------------
 // ⚡ UPTIME MONITORING / HEALTH CHECK (Express Server) ⚡
